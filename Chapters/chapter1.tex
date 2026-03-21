@@ -1,120 +1,29 @@
-% 
-%  chapter1.tex
-%  
-%  Created by Matilde Pós-de-Mina Pato on 2012/10/09.
 %
-\chapter{Introdução}
-\label{cha:introduction}
+%  chapter1.tex
+%
+\chapter{Introduction}
+\label{chap:introduction}
 
-\section{Linguagem e estilo}
-Qualquer trabalho deverá ser escrito como um artigo, i.e. a linguagem deve ser clara, objectiva, escrita em discurso directo e com frases curtas \cite{gustavii2016write, glasman2010science}.
+\section{Context and Motivation}
 
-A redação deve ser feita com frases curtas e objectivas, organizadas de acordo com a estrutura do trabalho, dando destaque a cada uma das partes abordadas, assim apresentadas: Introdução - Informar, em poucas palavras, o contexto em que o trabalho se insere, sintetizando a problemática estudada. Objetivo - Deve ser explicitado claramente. Métodos - Destacar os procedimentos metodológicos adoptados. Resultados - Destacar os mais relevantes para os objectivos pretendidos. Os trabalhos de natureza quantitativa devem apresentar resultados numéricos, assim como seu significado estatístico. Conclusões - Destacar as conclusões mais relevantes, os estudos adicionais recomendados e os pontos positivos e negativos que poderão influir no conhecimento. 
+Education systems worldwide face a persistent challenge: sustaining learner engagement over time, particularly in domains such as sustainability and digital literacy that demand continuous effort rather than one-off study sessions. Traditional instructional approaches rely heavily on static content, which is costly to produce and rapidly becomes outdated. Gamified platforms have emerged as a promising response to this challenge, consistently demonstrating measurable improvements in learner engagement and knowledge retention \cite{hamari2014does}. However, most existing solutions depend on manually authored question banks, which limits their scalability and increases operational cost.
 
-\paragraph{Parágrafo}
-\begin{enumerate}
-\item Um parágrafo  deve iniciar-se com uma frase curta e que contém a informação principal. As restantes devem acompanhar o conteúdo apresentado na primeira. A última deve fazer a ligação ao parágrafo seguinte.
-\item Os parágrafos devem interligar-se de forma lógica.
-\end{enumerate}
+A second structural problem compounds the first: the fragmentation of mobile ecosystems. Developing and maintaining separate native codebases for Android and iOS doubles engineering effort and slows the iteration cycle for small teams. Cross-platform frameworks have matured sufficiently to address this, but few gamified educational platforms have adopted them systematically.
 
-\paragraph{Estrutura}
+U!REKA Play4Change was designed to address both problems simultaneously. By combining serious game mechanics with an AI-powered content generation pipeline, the platform produces fresh, domain-specific tasks automatically on a nightly schedule, removing the manual authoring bottleneck. By targeting Android and iOS from a single Kotlin Multiplatform codebase, it eliminates platform duplication without sacrificing native user-interface fidelity. The result is a platform that scales content continuously while remaining economically viable for small development teams and educational institutions.
 
-O limite de páginas para cada UC será estipulado pelo docente e pode contemplar as seguintes partes: 
-\begin{enumerate}
-\item[Título] curto mas não genérico.
-\item[Capa] Use a capa apresentada neste documento. Complete a informação apresentada no ficheiro \texttt{datas.tex}.
-\item[Resumo] Faça um resumo dos conteúdos do trabalho e apresente as conclusões básicas, \texttt{resumo.tex} e \texttt{abstract.tex} (se necessário, c.c. comente a linha 155 de \texttt{template.tex}).
-\item[Índice] Indique as páginas dos títulos e subtítulos, figuras ou tabelas. O código que suporta algum parágrafo deve constar no índice respectivo, de Listagens.
-\item[Introdução] Contextualize o tema e indique o objectivo de estudo.
-\item[Desenvolvimento] Descreva as definições, modelos e teorias suportados por referências bibliográficas. 
-\item[Conclusão] Sintetize os aspectos relevantes.
-\item[Bibliografia] Escreva todas as referências indicadas no texto.
-\item[Anexos] Use os anexos para colocar outras informações que considere oportunas, mas não relevantes o suficiente para colocar no corpo do documento. 
-\end{enumerate}
+\section{Objectives}
 
-\paragraph{Bibliografia}
-As referências são listadas pela ordem alfabética do apelido dos autores e depois por ordem cronológica quando o nome se repetir, \textit{package: plainnat}. 
+The project pursued four core engineering objectives:
 
-\begin{enumerate}
-\item[Livros] Deve constar o nome original de um livro escrito em língua estrangeira. Pede-se que seja inserido as páginas consultadas. 
-\item[websites] Os sítios da internet consultados também devem constar nas referências. Pede-se que seja introduzido o dia de consulta do mesmo.
-\item[Artigos] Deve citar aqueles que se encontram indexados e submetidos a revisão independente. No instituto Thomson Reuters são fornecidas listas de toda a bibliografia que obedece a esse grau de exigência.
-\item[Trabalhos] Se a citação for relativa a uma comunicação pessoal, então faça-o do modo seguinte: M. Mjhdsh (comunicação pessoal, 13 de Março 2017). Noutros trabalhos deve constar a seguinte informação: ``Dissertação (ou, Relatório) de Mestrado (ou Doutoramento, ou Final de Curso) não publicada(o). 
-\end{enumerate}
+Multiplatform delivery from a single codebase, targeting Android and iOS using Kotlin Multiplatform and Compose Multiplatform, so that all business logic and user-interface components are shared across both platforms.
 
-Por uma questão de simplificação, pode recorrer ao  Google Académico\footnote{scholar.google.pt/} e retirar a informação que consta no sítio \texttt{Citar} no formato BibTeX e inserir no ficheiro \texttt{bibliography.bib}. Por exemplo:
-\footnotesize
-\begin{verbatim}
-@book{gustavii2016write,
-  title={How to write and illustrate a scientific paper},
-  author={Gustavii, Bj{\"o}rn},
-  year={2016},
-  publisher={Cambridge University Press}
-}
-\end{verbatim}
+Adaptive AI-generated content, producing domain-specific educational tasks nightly via a large language model pipeline built on LangChain4j and the Mistral API, with semantic deduplication through pgvector to prevent content repetition.
 
-\paragraph{Relatórios de Sistemas de Informação}
+Engagement loop engineering, implementing a server-side scoring engine that rewards correct and timely responses and applies penalties for inactivity or incorrect answers, driving sustained player motivation.
 
-Caracteres especiais para Álgebra Relacional
+Cost efficiency through batch generation, pre-computing all daily tasks during off-peak hours so that runtime requests are served from a local cache, eliminating inference latency and minimising API costs during active play sessions.
 
-\begin{table}[!htb]
-\begin{minipage}{.5\textwidth}
- \caption{Simbolos lógicos e outros}
- \centering  
-\begin{tabular}{|l|c|r|}
-\hline
-Logical AND & 	$\wedge$ \\
-Logical OR & 	$\vee$ \\
-Logical NOT & 	$\neg$ \\
-null & 			$\omega$ \\
-\hline
-\end{tabular}
-\vskip1em
-\caption{Operadores unários}
- \centering  
-\begin{tabular}{|l|c|r|}
-\hline
-selecção &  $\select_{cname<cname2} E$ \\
-projecção &  $\project_{cname} E$ \\
-função de agregação &  $_{g_1,g_2,\ldots} \aggregatefn_{h_1,h_2,\ldots,h_m}$ \\
-\hline
-\end{tabular}
+\section{Document Structure}
 
-\end{minipage}%
-\quad
-\begin{minipage}{.5\textwidth}
-\centering
-\caption{Operadores binários}
-\begin{tabular}{|l|c|r|}
-\hline
-união & 			\union \\
-intersecção & 		\intersection \\
-diferença & 		- \\
-produto cartesiano & \cross \\
-divisão & 			$\div$ \\
-renomeação & 			$\rho$ \\
-junção natural& 		$\bowtie$ \\
-junção theta & 		$\bowtie_{\theta}$ \\
-semi-junção à esquerda & 	$\leftsemijoin$ \\
-semi-junção à direita & 	$\rightsemijoin$ \\ 
-junção externa à esquerda & 	$\leftouterjoin$ \\
-junção externa à direita & 	$\rightouterjoin$ \\
-junção externa completa & 	$\fullouterjoin$ \\
-anti-junção & 			? \\
-\hline
-\end{tabular}
-    \end{minipage} 
-\end{table}
-
-Exemplo (\textit{Your \LaTeX  ~skills are likely superior to mine!}):
-\begin{displaymath}
-Grades \leftarrow \project_{(students.ssn, students.name, grades.grade)} \\
-(\select_{students.ccn = grades.ccn \wedge grades.assignment = 1} \\
-(students \cross grades)) \\
-\end{displaymath}
-\vskip-1em
-\begin{eqnarray*}
-Grades & \leftarrow & \project_{(students.ssn, students.name, grades.grade)}  \\
-       &            &(\select_{(students.ssn, students.name, grades.grade)}  \\
-       &            &          (students \cross grades)) 
-\end{eqnarray*}
+The remainder of this report is organised as follows. Chapter~\ref{chap:stateofart} surveys the relevant literature and existing technologies, covering gamification in education, serious games, multiplatform mobile development, AI-generated content, and related platforms. Chapter~3 describes the system architecture, detailing the design decisions behind the mobile application, the content generation pipeline, the authentication mechanism, and the scoring engine. Chapter~4 presents the implementation, including selected code artefacts and integration details. Chapter~5 covers evaluation, reporting on functional testing, performance measurements, and a qualitative assessment of the platform. Chapter~6 draws conclusions and outlines directions for future work.
