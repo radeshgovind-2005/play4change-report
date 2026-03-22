@@ -1,0 +1,47 @@
+%
+%  chapter6.tex
+%
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+\section{Summary of Contributions}
+
+U!REKA Play4Change makes four engineering contributions that, in combination, address a gap not filled by any existing platform in its domain.
+
+The first contribution is a working multiplatform gamified educational platform delivered from a single KMP (Kotlin Multiplatform) codebase. The same shared business logic and Compose Multiplatform user interface code runs on both Android and iOS, producing two deployable applications without duplicating engineering effort. This demonstrates that KMP is a viable foundation for production gamified educational software at this scope.
+
+The second contribution is a nightly AI content generation pipeline with semantic deduplication. The pipeline invokes the Mistral language model API through LangChain4j on a fixed nightly schedule, validates the structure of every generated task, and filters out semantically equivalent content using cosine similarity search over vector embeddings stored in PostgreSQL with pgvector. The pipeline operates at fixed daily cost regardless of user count and produces content that is ready before users become active, with zero inference latency on the user-facing request path.
+
+The third contribution is a server-side scoring engine that sustains the daily engagement loop. The engine applies configurable rewards for timely correct completions, streak multipliers for consecutive days of engagement, penalties for inactivity, and badge awards for milestone scores. The engine is implemented with optimistic locking and idempotency constraints that guarantee correctness under concurrent submissions and network retries.
+
+The fourth contribution is a cost model that scales sublinearly with users. By separating content generation from content delivery and generating content in fixed batches rather than on demand, the platform's primary operational cost --- AI model inference --- does not grow when users are added. This cost model is validated analytically and represents a structural advantage over on-demand generation that compounds with growth.
+
+\section{Objectives Achieved}
+
+\textbf{Objective 1: Multiplatform delivery from a single codebase.} This objective is met. The project produces an Android application and targets iOS from a single KMP project. The shared codebase includes all business logic, data models, network clients, local persistence, and the Compose Multiplatform user interface. The iOS target compiles successfully; production distribution via the App Store is an extended objective beyond this project's primary scope.
+
+\textbf{Objective 2: Adaptive AI-generated content with semantic deduplication.} This objective is met. The nightly batch pipeline generates domain-specific educational tasks using LangChain4j and the Mistral API, validates their structure, and discards semantically duplicate content using pgvector cosine similarity search. Content is available before users are active, with the deduplication threshold configurable to balance diversity and content volume.
+
+\textbf{Objective 3: Engagement loop engineering.} This objective is met. The scoring engine is implemented on the server, evaluates configurable reward and penalty rules, applies streak multipliers, and issues badge awards. The engagement loop --- open the app, complete a task, receive a score update, return tomorrow to maintain the streak --- is fully functional. The correctness of the engine under concurrent access and network retries is guaranteed by optimistic locking and database-level idempotency constraints.
+
+\textbf{Objective 4: Cost efficiency through batch pre-generation.} This objective is met analytically and validated in principle. The batch cost model is derived from first principles in Chapter~\ref{chap:architecture} and compared quantitatively with the on-demand model in Chapter~\ref{chap:evaluation}. At 10,000 active users with the current batch configuration, the batch model produces content at approximately 100 times lower cost per day than the on-demand alternative. Validation with real production traffic remains as extended future work.
+
+\section{Reflection on Engineering Decisions}
+
+The process of building U!REKA Play4Change required making explicit decisions under uncertainty, justifying each choice against the problem it was meant to solve rather than against technology preference. Several decisions produced insights that generalise beyond this specific project.
+
+The most significant insight came from the content generation architecture. The first impulse when building a feature is to implement it where it is needed: if users need tasks, generate tasks when users ask. Changing this to batch pre-generation required accepting an inversion of the usual request-response model, but the inversion resolved four problems simultaneously: latency, cost, availability dependency, and the inability to inspect content before delivery. The insight is that changing \textit{when} a problem is solved can change its entire cost structure. A problem that is expensive to solve at runtime may be cheap to solve in advance. This generalisation applies to many engineering problems: pre-computation, caching, and asynchronous processing all exploit this same principle.
+
+The consistency trade-off decision demonstrated a different kind of insight: that a single platform can legitimately have different correctness requirements for different data, and that recognising this prevents over-engineering in one direction or under-engineering in another. Applying a uniform "always consistent" policy would have forced task content reads to wait for authoritative confirmation, breaking the engagement loop during network disruptions. Applying a uniform "always available" policy would have allowed score reads from stale replicas, breaking the core contract of the gamified system. Recognising that task content and player scores have genuinely different requirements, and designing accordingly, is an example of engineering maturity over one-size-fits-all solutions.
+
+The dual-token authentication architecture illustrated the value of resolving an apparent dilemma by adding a dimension. The choice between long-lived tokens (convenient but risky) and short-lived tokens (safe but inconvenient) appeared binary. Adding a second token with a different lifetime and a rotation protocol resolved both concerns simultaneously, without compromising either. Many apparent binary engineering choices are resolvable by recognising that the two dimensions of the trade-off can be addressed by separate mechanisms.
+
+\section{Future Work}
+
+Three directions for future development are identified based on the limitations described in Chapter~\ref{chap:evaluation}.
+
+The first is per-user content personalisation without sacrificing the fixed cost model. The current design generates one set of tasks per domain per day, serving the same content to all players in that domain. A hybrid model would generate a larger pool of tasks per batch run and implement server-side selection logic that chooses from the pool based on each player's completion history, demonstrated strengths, and identified knowledge gaps. This preserves the batch cost structure while enabling adaptive content delivery. The selection logic would run at query time, using the player's completion records to filter and rank the available pool.
+
+The second is full production deployment of the iOS application through the Apple App Store. The KMP codebase targets iOS and the application builds for the iOS platform. The remaining work involves App Store submission, compliance with Apple's review guidelines, and thorough testing on physical iOS hardware across a range of devices and iOS versions.
+
+The third is a production observability dashboard built on the structured logging infrastructure already in place. The platform emits structured JSON logs from all components. Aggregating these into a Prometheus metrics store and building a Grafana dashboard would provide real-time visibility into batch job health, API latency distributions, error rates, and daily content generation success rates. Alert rules on the P95 batch completion time and the API error rate would enable proactive incident response rather than reactive investigation.

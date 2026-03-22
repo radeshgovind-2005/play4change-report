@@ -7,30 +7,84 @@
 \setcounter {tocdepth}{-1}
 \contentsline {chapter}{Índice}{vii}{chapter*.5}%
 \setcounter {tocdepth}{3}
-\contentsline {chapter}{Lista de Figuras}{ix}{chapter*.6}%
-\contentsline {chapter}{Lista de Tabelas}{xi}{chapter*.7}%
-\contentsline {chapter}{Lista de Listagens}{xiii}{chapter*.8}%
+\contentsline {chapter}{Lista de Tabelas}{xi}{chapter*.6}%
 \babel@toc {portuguese}{}\relax 
 \contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
 \contentsline {section}{\numberline {1.1}Context and Motivation}{1}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Objectives}{1}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Document Structure}{2}{section.1.3}%
-\contentsline {chapter}{\numberline {2}State of the Art}{3}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Gamification in Education}{3}{section.2.1}%
-\contentsline {subsection}{\numberline {2.1.1}Evidence of Effectiveness}{3}{subsection.2.1.1}%
-\contentsline {section}{\numberline {2.2}Serious Games}{3}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Multiplatform Mobile Development}{4}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Native versus Cross-Platform Approaches}{4}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Justification for Kotlin Multiplatform and Compose Multiplatform}{4}{subsection.2.3.2}%
-\contentsline {section}{\numberline {2.4}AI-Generated Content in Education}{4}{section.2.4}%
-\contentsline {subsection}{\numberline {2.4.1}Large Language Models for Educational Content}{4}{subsection.2.4.1}%
-\contentsline {subsection}{\numberline {2.4.2}LangChain4j and the Mistral API}{4}{subsection.2.4.2}%
-\contentsline {section}{\numberline {2.5}Related Platforms}{5}{section.2.5}%
-\contentsline {chapter}{\numberline {3}Tutorial de \texttt {LaTeX} com exemplos}{7}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Tabelas}{7}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Importar Figuras}{7}{section.3.2}%
-\contentsline {subsection}{\numberline {3.2.1}Inserir figuras lado-a-lado com texto}{7}{subsection.3.2.1}%
-\contentsline {subsection}{\numberline {3.2.2}Outras imagens}{8}{subsection.3.2.2}%
-\contentsline {section}{\numberline {3.3}Listagens}{8}{section.3.3}%
-\contentsline {chapter}{Referências}{9}{chapter*.12}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Proposed Solution}{2}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Objectives}{3}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Document Structure}{3}{section.1.5}%
+\contentsline {chapter}{\numberline {2}State of the Art}{5}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Gamification in Education}{5}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Evidence of Effectiveness}{5}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}Serious Games}{6}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Multiplatform Mobile Development}{6}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Native versus Cross-Platform Approaches}{6}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Justification for Kotlin Multiplatform}{7}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}AI-Generated Content in Education}{7}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Large Language Models for Educational Content}{7}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}LangChain4j and the Mistral API}{7}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Semantic Deduplication with pgvector}{8}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}Related Platforms}{8}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Identified Gap}{9}{section.2.6}%
+\contentsline {chapter}{\numberline {3}Architecture and Design}{11}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Architectural Overview}{11}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Content Generation Pipeline}{11}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}The Case Against On-Demand Generation}{11}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Batch Pre-Generation}{12}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Semantic Deduplication}{13}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.2.4}Content Quality Validation}{14}{subsection.3.2.4}%
+\contentsline {section}{\numberline {3.3}Data Persistence}{14}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Why a Single Relational Database}{14}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Transactional Correctness and ACID}{15}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Concurrent Write Safety}{15}{subsection.3.3.3}%
+\contentsline {section}{\numberline {3.4}Mobile Client Architecture}{16}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Offline-First Design}{16}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Caching Strategy}{16}{subsection.3.4.2}%
+\contentsline {section}{\numberline {3.5}Authentication and Session Management}{17}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Delegated Authentication}{17}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Dual-Token Architecture}{17}{subsection.3.5.2}%
+\contentsline {section}{\numberline {3.6}Scoring Engine}{18}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Consistency Trade-offs}{18}{section.3.7}%
+\contentsline {subsection}{\numberline {3.7.1}Task Content: Availability over Consistency}{18}{subsection.3.7.1}%
+\contentsline {subsection}{\numberline {3.7.2}Player Scores: Consistency over Availability}{18}{subsection.3.7.2}%
+\contentsline {section}{\numberline {3.8}Observability}{19}{section.3.8}%
+\contentsline {section}{\numberline {3.9}Deployment}{19}{section.3.9}%
+\contentsline {chapter}{\numberline {4}Implementation}{21}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Monorepo Structure}{21}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Kotlin Multiplatform Client}{21}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Shared Business Logic}{21}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Compose Multiplatform UI}{22}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Navigation with Decompose}{22}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}Dependency Injection with Koin}{22}{subsection.4.2.4}%
+\contentsline {section}{\numberline {4.3}Backend: Spring Boot}{22}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}REST API Design}{22}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Nightly Batch Job}{23}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Scoring Engine Implementation}{23}{subsection.4.3.3}%
+\contentsline {section}{\numberline {4.4}Content Generation Pipeline}{23}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}LangChain4j Integration}{23}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Mistral API Configuration}{24}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}Schema Validation and Retry Logic}{24}{subsection.4.4.3}%
+\contentsline {subsection}{\numberline {4.4.4}pgvector Deduplication}{24}{subsection.4.4.4}%
+\contentsline {section}{\numberline {4.5}Database Schema}{24}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Authentication Implementation}{25}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Deployment with Docker Compose}{25}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Evaluation}{27}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Functional Testing}{27}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Performance Evaluation}{28}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Batch Generation Latency}{28}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}API Response Latency}{28}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Cold-Start Behaviour}{28}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}Cost Model Validation}{28}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Limitations and Future Work}{29}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}Absence of Per-User Personalisation}{29}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}iOS Deployment}{29}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}Observability Dashboard}{29}{subsection.5.4.3}%
+\contentsline {chapter}{\numberline {6}Conclusion}{31}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Summary of Contributions}{31}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Objectives Achieved}{31}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Reflection on Engineering Decisions}{32}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Future Work}{33}{section.6.4}%
+\contentsline {chapter}{Referências}{35}{chapter*.29}%
 \contentsline {chapter}{\numberline {A}Applied Survival Analysis by Hosmer and Lemeshow}{i}{appendix.A}%

@@ -1,0 +1,92 @@
+%
+%  chapter5.tex
+%
+\chapter{Evaluation}
+\label{chap:evaluation}
+
+This chapter evaluates the platform against the four objectives stated in Chapter~\ref{chap:introduction}. It covers functional testing of the primary user and system flows, performance measurements of the batch pipeline and API layer, validation of the cost model, and an honest assessment of the platform's current limitations.
+
+\section{Functional Testing}
+
+Functional testing verified that each primary flow in the platform behaves correctly under normal conditions and under defined error conditions. The tested flows are as follows.
+
+The authentication flow verifies that a player can authenticate via the configured OAuth~2.0 identity provider, that the backend issues a correctly signed access token and a refresh token, that the access token can be used to access protected endpoints, that an expired access token is rejected with a 401 response, that presenting a valid refresh token produces a new access token and a new refresh token, and that presenting a previously used refresh token triggers full session revocation.
+
+The task completion flow verifies that a player can fetch today's tasks, submit a correct response, receive the expected score update, and see the completion reflected in their progress. It also verifies that submitting the same completion twice --- simulating a network retry --- results in a single score update, validating the idempotency constraint.
+
+The score calculation flow verifies that the scoring engine applies the configured reward for a correct timely response, applies the streak multiplier when applicable, and applies the inactivity penalty after the configured threshold has passed without a completion.
+
+The deduplication pipeline verifies that two tasks generated from the same domain on the same night that are semantically equivalent --- as determined by cosine similarity exceeding the configured threshold --- result in only one task being stored.
+
+The offline submission flow verifies that a task completion written to the local outbox while the network is unavailable is delivered to the server when connectivity is restored, and that the resulting score update is applied correctly.
+
+\todo{Expand with test results table showing pass/fail status for each tested flow, test environment description, and test data used.}
+
+\section{Performance Evaluation}
+
+\subsection{Batch Generation Latency}
+
+The nightly batch job must complete before users become active in the morning. The job generates all tasks for the following day, validates their structure, deduplicates them against stored vectors, and writes valid tasks to the database. The total duration of the job depends on the number of tasks generated, the response time of the Mistral API, and the duration of vector similarity queries.
+
+The job must complete before 06:00 to ensure content is available when users begin their day. The measurement of interest is the end-to-end duration of the complete batch run across all configured domains and difficulty levels.
+
+\todo{Expand with measured batch job duration across multiple runs, broken down by phase (generation, validation, deduplication, write), with P50 and P95 reported.}
+
+\subsection{API Response Latency}
+
+Task content served from the server-side cache does not involve any database query or AI inference. The response latency for a task fetch request on a warm cache should be dominated by network round-trip time and serialisation cost, with no upstream processing time.
+
+The measurements of interest are P50, P95, and P99 latency for the task fetch endpoint under typical load, and the same measurements for the score submission endpoint, which involves a database write and the scoring engine evaluation.
+
+\todo{Expand with latency measurements from load testing, showing percentile distribution for the primary endpoints. Target: task fetch P95 under 100ms, score submission P95 under 200ms.}
+
+\subsection{Cold-Start Behaviour}
+
+On the first launch of the application after installation, no content is cached locally. The player must wait for the initial task content to be fetched from the server. The measurement of interest is the time from first application launch to task content being displayed.
+
+The cold-start latency is bounded by the network round-trip time to the server and the server's response time on a warm cache. Because content is pre-generated and cached, the server response time is low. The dominant factor on a typical mobile network is the round-trip time.
+
+\todo{Expand with measured cold-start latency on typical mobile network conditions (4G and WiFi), compared against industry standard thresholds for perceived responsiveness.}
+
+\section{Cost Model Validation}
+
+The architectural decision to use batch pre-generation rather than on-demand generation was motivated in part by its cost model. Section~3.2.2 expressed the cost comparison algebraically. This section validates the model with concrete numbers.
+
+Table~\ref{tab:cost} compares the daily API cost of the on-demand and batch models at three user scales, assuming a fixed configuration of 5 subject domains with 20 tasks per domain (100 total tasks per batch run), and a cost per generation of $c$ (a placeholder for the actual Mistral API pricing):
+
+\begin{table}[ht]
+    \caption{Daily AI generation cost comparison: batch versus on-demand.}\vskip0.5em
+    \label{tab:cost}
+    \centering
+    \begin{tabular}{lll}
+        \toprule
+        Active Users & On-Demand Daily Cost & Batch Daily Cost \\
+        \midrule
+        100   & $100c$     & $100c$ (break-even) \\
+        1{,}000  & $1{,}000c$  & $100c$ (10$\times$ cheaper) \\
+        10{,}000 & $10{,}000c$ & $100c$ (100$\times$ cheaper) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Table~\ref{tab:cost} shows that the batch model breaks even with the on-demand model at exactly the number of tasks generated per batch run. Below this user count, both models cost similarly. Above this user count, the batch model becomes progressively cheaper. At 10,000 active users, the batch model costs 100 times less per day than the on-demand model with the same content volume, as derived from Equations~\ref{eq:cost} in Chapter~\ref{chap:architecture}.
+
+The batch model's cost does not change when users are added. Hiring, marketing, and institutional partnerships that grow the user base do not trigger proportionally higher infrastructure costs. This property makes the platform economically viable as a product for educational institutions of varying size.
+
+\todo{Expand with actual measured API costs from the implementation's nightly runs, replacing the symbolic $c$ with real figures.}
+
+\section{Limitations and Future Work}
+
+\subsection{Absence of Per-User Personalisation}
+
+The current design generates content at the domain level, not the user level. Every player enrolled in the same domain receives the same task on the same day. This is a deliberate simplification that preserves the fixed cost model: generating one set of tasks per domain, regardless of user count, is the source of the cost advantage described above.
+
+The limitation is that the platform cannot adapt to a player's demonstrated strengths and weaknesses. A player who consistently answers questions about energy efficiency correctly would benefit from harder energy questions or questions in adjacent topics, but the current engine does not make this adaptation. Real-time per-user personalisation would require on-demand generation (reintroducing latency and per-user cost) or a hybrid model in which a larger pool is generated per batch and the server selects from the pool based on the player's history. The hybrid approach is technically tractable and is identified as future work.
+
+\subsection{iOS Deployment}
+
+Delivering a production iOS application requires an Apple Developer Program membership and submission through the App Store review process. These are extended objectives for this project. The KMP and Compose Multiplatform implementation targets iOS, and the codebase compiles for the iOS target. However, distribution through the App Store and thorough testing on physical iOS hardware remain as future work beyond the project's primary scope.
+
+\subsection{Observability Dashboard}
+
+The platform emits structured logs as described in Section~3.9. An extended objective is to aggregate these logs into a Prometheus metrics store and visualise them in a Grafana dashboard, providing real-time visibility into batch job outcomes, API latency distributions, and error rates. The infrastructure for this observability layer exists and is configured in the Docker Compose file, but the dashboard definitions and alerting rules are not part of the core deliverable.

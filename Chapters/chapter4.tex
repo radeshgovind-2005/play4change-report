@@ -1,0 +1,139 @@
+%
+%  chapter4.tex
+%
+\chapter{Implementation}
+\label{chap:implementation}
+
+This chapter describes how the architectural decisions of Chapter~\ref{chap:architecture} were realised in code. Where Chapter~3 answers \textit{why} each component was designed as it was, this chapter answers \textit{how} it was built. Sections that involve internal implementation details not fully confirmed at the time of writing use \texttt{\textbackslash todo} annotations to indicate where further expansion is needed.
+
+\section{Monorepo Structure}
+
+The project is structured as a monorepo: a single version-controlled repository containing both the mobile client and the backend server. This structure reflects the tight coupling between the client and backend at the API boundary: when an API contract changes, both sides of the boundary must be updated together. A monorepo makes this coupling visible in the version history and prevents the client and server from diverging silently across separate repositories.
+
+The repository is divided into two top-level modules: the KMP (Kotlin Multiplatform) mobile client and the Spring Boot backend. Each module has its own build configuration but shares the same root build tooling, enabling coordinated builds and cross-module dependency management.
+
+\todo{Expand with directory tree listing showing module structure.}
+
+\section{Kotlin Multiplatform Client}
+
+\subsection{Shared Business Logic}
+
+The KMP module defines a \texttt{commonMain} source set that contains all code shared across Android and iOS. This includes the data models that represent tasks, player scores, and session state; the network clients that communicate with the backend API; the local persistence layer that implements the client-side cache and the outbox queue; and the scoring engine state management that interprets server responses and updates the UI state.
+
+Code in \texttt{commonMain} is compiled to JVM bytecode for Android and to native machine code for iOS using the Kotlin Native compiler. Platform-specific source sets (\texttt{androidMain} and \texttt{iosMain}) contain only the code that cannot be shared: platform-specific file system paths, platform-specific secure storage access for the refresh token, and any platform API calls that have no cross-platform abstraction.
+
+\todo{Expand with code listing showing a shared data model and its use in both platform targets.}
+
+\subsection{Compose Multiplatform UI}
+
+The user interface is built with Compose Multiplatform, a declarative UI framework that extends Jetpack Compose --- the standard Android UI toolkit --- to also target iOS. All screen definitions, composable functions, and UI state holders are written once in \texttt{commonMain} and rendered natively on each platform.
+
+The declarative model means the UI is expressed as a function of state: given the current state of the application --- loading, displaying a task, displaying a score update --- the composable functions describe what should appear on screen. The Compose runtime manages the difference between the current and previous state and applies only the necessary updates to the rendered output. This model maps naturally to the gamified UI pattern, where score changes, badge awards, and streak updates must be animated in response to player actions.
+
+\todo{Expand with screenshot and code listing of the daily task screen composable.}
+
+\subsection{Navigation with Decompose}
+
+Navigation between screens is implemented using Decompose, a KMP-compatible navigation library that manages the back stack and screen lifecycle in a platform-independent way. Each screen is associated with a component --- a class that holds the screen's state and logic. Components are created and destroyed by the navigation framework as the player moves between screens, and their state persists across configuration changes such as device rotation.
+
+Decompose was selected over alternatives because it does not depend on platform-specific navigation APIs, making the navigation logic fully shareable between Android and iOS without platform-specific adaptations.
+
+\todo{Expand with navigation graph diagram and component hierarchy.}
+
+\subsection{Dependency Injection with Koin}
+
+Dependencies --- network clients, repositories, use cases --- are wired together using Koin, a lightweight dependency injection framework for Kotlin that supports KMP. Koin defines dependencies as modules: each module declares how its components are created and what their dependencies are. At runtime, Koin resolves the dependency graph and provides each component with the objects it needs.
+
+Dependency injection was chosen over direct instantiation to make components testable in isolation: a network client can be replaced with a test double in unit tests without modifying the component under test. Koin was selected over alternatives because its API is idiomatic Kotlin and its KMP support is mature.
+
+\todo{Expand with Koin module definition listing.}
+
+\section{Backend: Spring Boot}
+
+\subsection{REST API Design}
+
+The backend exposes a REST API over HTTPS. Each resource --- tasks, completions, scores, sessions --- is addressed by a URL, and operations on that resource are expressed using standard HTTP methods: GET to retrieve, POST to create, PATCH to update. The API follows the principle that each endpoint should perform exactly one semantically coherent action, with the request body defining the parameters of that action.
+
+All API responses use a consistent envelope structure: a status field indicating success or failure, a data field containing the resource or result, and an errors field containing structured error information when the request cannot be processed. This consistency allows the mobile client to use a single response-handling layer for all API calls.
+
+Authentication is enforced by a filter applied to all protected endpoints. The filter extracts the JWT from the HTTP \texttt{Authorization} header, verifies the signature cryptographically, extracts the user identity from the payload, and makes it available to the endpoint handler. No session store is consulted; verification is purely computational.
+
+\todo{Expand with OpenAPI specification excerpt showing task and completion endpoints.}
+
+\subsection{Nightly Batch Job}
+
+The nightly batch job is implemented as a Spring \texttt{@Scheduled} task. Spring's scheduling infrastructure invokes the annotated method at the configured time each night, running it on a dedicated thread separate from the request-handling threads. The job iterates over all configured domains and difficulty levels, invokes the LangChain4j generation pipeline for each, and writes the resulting valid tasks to the database.
+
+The batch job is idempotent by design. If the job is interrupted and restarted, duplicate content that was generated in the first partial run is rejected by the semantic deduplication layer before insertion, so the job can be rerun safely without producing duplicate tasks.
+
+\todo{Expand with code listing of the scheduled task method and retry logic.}
+
+\subsection{Scoring Engine Implementation}
+
+The scoring engine is implemented as a service class that receives a task completion request, evaluates the applicable rules, and produces a score update transaction. The evaluation logic reads the player's current score, current streak count, and the set of tasks completed today, then applies the configured reward or penalty and determines whether a badge has been earned.
+
+The score update is applied using optimistic locking: the player record is read with its current version, the new score is computed, and the update is written with a version check. If the version check fails, the operation is retried. The task completion record is inserted with a unique constraint check; a duplicate insertion is caught and treated as an idempotent success.
+
+\todo{Expand with scoring rule configuration format and code listing of evaluation logic.}
+
+\section{Content Generation Pipeline}
+
+\subsection{LangChain4j Integration}
+
+LangChain4j is integrated as a dependency of the backend module. The integration defines an AI service interface --- a Java interface annotated with LangChain4j annotations that specify the prompt template and the expected output type. LangChain4j generates an implementation of this interface at runtime, handling prompt construction, model invocation, response parsing, and retry on transient errors.
+
+The prompt template parameterises the generation request by domain, difficulty level, and any additional context. The expected output type is a structured Java record matching the task schema, and LangChain4j uses the model's structured output capabilities to produce a response that can be deserialised directly without manual parsing.
+
+\todo{Expand with AI service interface definition and prompt template.}
+
+\subsection{Mistral API Configuration}
+
+The Mistral API is configured as the model backend for LangChain4j. The configuration specifies the model identifier, API key, and generation parameters: temperature (which controls the randomness of the output, set to a moderate value to balance diversity and coherence), maximum token count (set to constrain response length), and response format (JSON, to support structured output parsing).
+
+The API key is provided as an environment variable and is never stored in the codebase or version control history.
+
+\todo{Expand with configuration file excerpt and environment variable setup.}
+
+\subsection{Schema Validation and Retry Logic}
+
+Every model response is validated against the task schema before any write occurs. The schema defines required fields, their types, and constraints on their values. Validation is implemented as a check on the deserialised output object.
+
+If validation fails, the pipeline retries the generation call up to a configured maximum number of attempts. Each retry uses the same prompt; the non-determinism of the language model means subsequent attempts may produce a valid response even if the first attempt did not. If all retries are exhausted, the task slot is logged as failed and the pipeline moves on to the next slot. The batch job reports the total number of generated and failed slots at completion.
+
+\todo{Expand with validation logic code listing and retry configuration.}
+
+\subsection{pgvector Deduplication}
+
+After a task passes schema validation, its text is passed to a sentence embedding model to produce a vector representation of its meaning. The embedding model is invoked through LangChain4j's embedding API, which supports multiple backend models through the same interface.
+
+The resulting vector is used in a pgvector similarity query against the stored task vectors. The query retrieves the most similar stored task and its cosine similarity score. If the similarity score exceeds the configured threshold, the new task is discarded as a near-duplicate. If it is below the threshold, the task and its vector are inserted together in a single database transaction.
+
+\todo{Expand with SQL query listing for vector similarity check and insertion.}
+
+\section{Database Schema}
+
+The database schema defines tables for player identity, player scores and progress, task content, task embeddings, and task completion records. The task content table is partitioned by date to ensure that queries for today's tasks touch only the current partition, keeping query performance predictable as the task library grows.
+
+The player score table carries a version column for optimistic locking. The task completion table carries a unique constraint on the composite key of player identifier and task identifier, enforcing idempotency at the database level.
+
+The pgvector extension is enabled with the \texttt{CREATE EXTENSION vector} command, and the embedding column in the task table is defined as type \texttt{vector(n)} where \texttt{n} is the dimensionality of the chosen embedding model.
+
+\todo{Expand with full schema definition including all tables, indices, and constraints.}
+
+\section{Authentication Implementation}
+
+OAuth~2.0 delegated authentication is implemented using Spring Security's OAuth~2.0 client support. The application registers one or more identity providers. When a player initiates login, Spring Security redirects to the identity provider's authorisation endpoint. After the player authenticates, the identity provider redirects back to the application with an authorisation code. The application exchanges the code for an identity token, extracts the user's identity claims, and creates or retrieves the local player record.
+
+JWT issuance is implemented using a JWT library. The backend signs the access token with a private key using the RS256 algorithm (RSA signature with SHA-256). The public key is available for verification by any backend instance, enabling stateless authentication across horizontally scaled instances. The refresh token is a randomly generated opaque string stored in the database with an associated expiry time and revocation flag. On every use, the refresh token is immediately revoked and a new one is issued, implementing the rotation described in Section~3.5.2.
+
+\todo{Expand with Spring Security configuration and JWT issuance code listing.}
+
+\section{Deployment with Docker Compose}
+
+The Docker Compose configuration defines two services: the Spring Boot backend and the PostgreSQL database. The database service uses an official PostgreSQL image with the pgvector extension pre-installed. The backend service is built from a multi-stage Dockerfile: the first stage compiles the application using a Gradle build, and the second stage copies the compiled jar into a minimal JRE image, keeping the final image as small as possible.
+
+Environment variables provide all configuration that varies between environments: database credentials, API keys, signing keys, and scheduled job times. These variables are supplied at deployment time and are not stored in the Compose file itself.
+
+The database service uses a named volume for persistent storage, ensuring that data survives container restarts. The backend service depends on the database service and will not start until the database is ready to accept connections.
+
+\todo{Expand with Docker Compose file listing and deployment steps.}

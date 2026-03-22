@@ -1,96 +1,202 @@
-\chapter{Tutorial de \texttt{LaTeX} com exemplos}
-\label{cha:a_short_latex_tutorial_with_examples}
+%
+%  chapter3.tex
+%
+\chapter{Architecture and Design}
+\label{chap:architecture}
 
-Este capítulo irá mostrar como pode inserir tabelas, figuras e/ou listagens. Consi\-de\-re-se que listagens não são todo o código mas partes do código. Estas irão suportar algumas frases dos parágrafos escritos. Não se esqueça, que todas as tabelas, figuras e listagens devem ser referenciadas no corpo do texto.
+This chapter describes the architecture of U!REKA Play4Change and the engineering reasoning behind each design decision. For every significant component, the chapter identifies the problem that required a decision, surveys the candidate approaches that exist to solve it, evaluates their trade-offs, and justifies the chosen approach. The goal is not to describe what was built, but to explain why it was built that way.
 
-\section{Tabelas} % (fold)
-\label{sec:inserting_tables}
+\section{Architectural Overview}
 
-Some notes are important to followed, such as present in \tablename~  \ref{tab:results}: 
-\begin{inparaenum}[i)]
-	\item Not defined vertical lines;
-	\item The legend must be on top;
-	\item Use \verb!\toprule!, \verb!\midrule! and \verb!\bottomrule! to draw horizontal lines.
-\end{inparaenum}
- 
+U!REKA Play4Change is composed of three principal components: a mobile client, a server-side backend, and a content generation pipeline. These components are connected by a set of design decisions that reflect the engineering constraints identified in Chapter~\ref{chap:introduction}: AI inference cannot be on the user's request path; player scores must be correct under concurrent access; the mobile application must function during network unavailability; and the cost model must not scale linearly with users.
+
+The mobile client runs on Android and iOS from a single KMP (Kotlin Multiplatform) codebase. It communicates with the backend over HTTPS, caches task content locally, and queues score submissions in a local outbox when the network is unavailable. The backend is a stateless Spring Boot application that serves task content, records completions, and manages the scoring engine. A nightly batch job, executed within the same backend process, calls the Mistral language model API to generate new content, validates and deduplicates it, and writes valid tasks to the database. All persistent state is stored in a single PostgreSQL database extended with the pgvector module for vector similarity search.
+
+\section{Content Generation Pipeline}
+
+\subsection{The Case Against On-Demand Generation}
+
+The platform's defining feature is AI-generated educational content. When designing how this content reaches a player, the most intuitive approach is to generate it when the player requests it: the player opens the app, a request goes to the server, the server calls the AI service, waits for a response, and returns the task. This is called synchronous on-demand generation.
+
+This approach has three fatal properties for a mobile educational platform. First, language model inference is not fast. Generating a single task requires sending a prompt to the AI service, waiting for it to process the input, and receiving the output. Depending on model size and server load, this takes between two and eight seconds. A mobile user who opens an app and sees a loading screen for five seconds before content appears will stop opening the app. The engagement loop breaks at the first interaction.
+
+Second, a platform using on-demand generation is available to users only if the AI service is available. Third-party services have outages, rate limits, and maintenance windows. If the AI service is unavailable when a user opens the app, the user sees an error. The platform's reliability becomes dependent on a component it does not control, available during every hour the platform is in use.
+
+Third, cost scales linearly with users. Every user session triggers at least one API call to the AI service. As the user base grows, the daily API cost grows proportionally. A platform that succeeds becomes more expensive at the same rate it grows.
+
+\subsection{Batch Pre-Generation}
+
+The solution is to separate the moment of generation from the moment of delivery. Rather than generating content when users request it, a scheduled job generates all content for the following day during a low-traffic period at night, stores the results, and serves them from storage when users arrive. This is the batch pre-generation model.
+
 \begin{table}[ht]
-	\caption{Table's rules.}\vskip0.5em
-	\label{tab:results}
-\centering
-\begin{tabular}{llr}
-\toprule
-\multicolumn{2}{c}{Item} \\
-\cmidrule(r){1-2}
-Animal & Description & Price (\$) 
-\\
-\midrule
-Gnat  & per gram & 13.65 \\
-      & each     &  0.01 \\
-Gnu   & stuffed  & 92.50 \\
-Emu   & stuffed  & 33.33 \\
-\bottomrule
-\end{tabular}
+    \caption{Comparison of content generation strategies.}\vskip0.5em
+    \label{tab:generation}
+    \centering
+    \begin{tabular}{lllll}
+        \toprule
+        Approach & Latency & Cost Model & AI Availability Dependency & Quality Gate \\
+        \midrule
+        Synchronous on-demand & 2--8 s & Per user & Coupled & None \\
+        Async with polling & Non-blocking & Per user & Coupled & None \\
+        Streaming & Perceived low & Per user & Coupled & None \\
+        \textbf{Batch pre-generation} & \textbf{Zero} & \textbf{Fixed} & \textbf{Decoupled} & \textbf{Full} \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
+Table~\ref{tab:generation} compares the four candidate generation strategies. Batch pre-generation is the only approach that resolves all three problems simultaneously: zero latency on the user request path, fixed cost regardless of user count, and complete decoupling of user-facing availability from AI service availability.
 
-\section{Importar Figuras} % (fold)
-\label{sec:importing_images}
+The cost advantage is quantified as follows. In the on-demand model, the daily cost is proportional to the number of active users. In the batch model, the daily cost is proportional to the number of subject domains multiplied by the number of tasks per domain --- a fixed quantity controlled by platform configuration, not by user behaviour:
 
-\subsection{Inserir figuras lado-a-lado com texto} % (fold)
- \label{ssec:inserting_images_wrapped_with_text}
- 
- You should only use this feature is \emph{really} necessary. This means, you have a very small image, that will look lonely just with text above and below.
+\begin{equation}
+\label{eq:cost}
+    \text{On-demand cost} = \text{active\_users} \times \text{cost\_per\_generation}
+\end{equation}
 
- \begin{wrapfigure}{l}{3cm}
-   \centering
-     \includegraphics[width=2cm]{evolution_steps-vectorial}
-   \caption{Vectorial image}\
- \end{wrapfigure}	
- 
- \noindent\verb!\usepackage{wrapfig}!\\
- This then gives you access to:\\
- \verb!\begin{wrapfigure}[lineheight]{alignment}{width}!
- 
- Alignment can normally be either 'l' for left, or 'r' for right. Lowercase 'l' or 'r' forces the figure to start precisely where specified (and may cause it to run over page breaks), while capital 'L' or 'R' allows the figure to float. If you defined your document as twosided, the alignment can also be 'i' for inside or 'o' for outside, as well as 'I' or 'O'. The width is obviously the width of the figure. \\[.5em]
+\begin{equation}
+    \text{Batch cost} = \text{domains} \times \text{tasks\_per\_domain} \times \text{cost\_per\_generation}
+\end{equation}
 
- 
- 
-\subsection{Outras imagens} % (fold)
-\label{ssec:floats_figures_and_captions}
+At 1,000 active users and a configuration of 5 domains with 20 tasks each, the batch model costs approximately 10 times less than the on-demand model. At 10,000 users, the batch model costs approximately 100 times less. The cost advantage compounds with growth. The batch architecture is not merely a latency optimisation --- it is the difference between a cost model that collapses under success and one that improves with it.
 
- 
-There are two different ways to place two figures/tables side-by-side.  More complicated figures with multiple images. You can do this using subfigure environments inside a figure environment. Subfigure will alphabetically number your subfigures and you have access to the complete reference as usual through \verb!\ref{fig:figurelabel}!, \figurename~\ref{fig:figura-completa}, or \figurename~\ref{fig:ra-raster} using \verb!\ref{fig:subfigurelabel}!.
+The key engineering insight is that changing \textit{when} a problem is solved can change its cost structure entirely. By running generation at 23:00 each night rather than on each user's request, the failure surface shrinks from all hours of operation to a single known window each night, and fallback strategies for that window are tractable: the batch job retries with exponential delays; if all retries are exhausted, a curated static content library provides fallback content; the developer is alerted by 06:00 so the issue can be investigated before users are active.
 
-\begin{figure}[htbp]
-	\centering
-    \begin{subfigure}[b]{0.25\textwidth}
-    	\centering
-		\includegraphics[width=\textwidth]{ra-vectorial}
-		\caption{}
-		\label{fig:ra-vectorial}
-     \end{subfigure}	
-\qquad\qquad
- 	\begin{subfigure}[b]{0.25\textwidth}
-    	\centering
-		\includegraphics[width=\textwidth]{ra-raster}
-		\caption{}
-		\label{fig:ra-raster}
-	\end{subfigure}		
-  \caption{Subfigure example with vectorial and no-vectorial images}
-  \label{fig:figura-completa}
-\end{figure}
+The batch job is implemented as a Spring \texttt{@Scheduled} task within the backend process. It runs at a fixed time each night, generates tasks for each configured domain and difficulty level, and writes valid results to the database.
 
-\section{Listagens} % (fold)
-\label{sec:listings}
+\subsection{Semantic Deduplication}
 
-Using the package listings you can add non-formatted text as you would do with \verb!\begin{verbatim}! but its main aim is to include the source code of any programming language within your document, or inline with 
-\verb!\codejava{int i;}.!
-If you wish to include pseudocode or algorithms see \url{http://en.wikibooks.org/wiki/LaTeX/Algorithms\_and\_Pseudocode}, as \lstlistingname ~\ref{lst:Calculadora}.
-\vskip1em
+A language model has no memory between invocations. If the same prompt is issued on two consecutive nights, the model may produce tasks that are conceptually equivalent --- the same educational idea expressed in different words. Over weeks and months, a player will notice that they are being asked to do the same thing repeatedly. The engagement loop deteriorates.
 
-%  \lstfromfile{language}{linerange}{caption}{label}{othersinsideoflstinoputlisting}{path}
+The naive solution is to check whether the exact text of a new task already exists in the database. This fails entirely because language models paraphrase naturally. The texts "sort your recycling correctly" and "separate your waste into the appropriate bins" have no words in common yet convey the same educational instruction. Exact text comparison cannot detect this equivalence.
 
-\lstfromfile{java}{7,11-12,15-17}{Opera\c{c}\~{o}es elementares de uma Calculadora}{Calculadora}{showlines=true,morekeywords={begin,System,out,print},numbers=left, firstnumber=1}{Calculadora.java}
+The correct framing is to compare the meaning of texts rather than their words. Vector embeddings provide this capability. A sentence embedding model converts any piece of text into a high-dimensional numerical vector --- an array of floating-point numbers --- where texts with similar meanings produce vectors that point in similar directions in the embedding space.
 
+Measuring similarity between two vectors requires choosing a metric. Euclidean distance measures the straight-line distance between the tips of the vectors. This is sensitive to vector magnitude, which depends on sentence length rather than semantic content. A long sentence and a short sentence expressing the same idea will have vectors of different magnitudes, and their Euclidean distance will be large despite identical meaning. Cosine similarity measures the angle between two vectors rather than the distance between their tips. The angle is independent of vector magnitude, so long and short sentences expressing the same idea produce a cosine similarity near 1.0 regardless of their length difference. Cosine similarity is the correct metric for semantic text comparison.
 
-\centering{\textbf{Written by Matilde Pós-de-Mina Pato\footnote{O autor escreve segundo o antigo AO}, \\2020 September -  version 2.2}}
+The deduplication procedure runs within the nightly batch job, before any new task is committed to the database: the new task is embedded, and its vector is compared against all stored task vectors using cosine similarity. If any stored task has a similarity above a defined threshold, the new task is discarded. A task below the threshold is stored along with its embedding vector for future comparisons.
+
+With thousands of stored tasks, comparing a new vector against every stored vector in sequence becomes slow. An approximate nearest-neighbour index groups stored vectors into clusters; a new vector is compared only against the nearest cluster rather than every entry. This reduces query cost from O(n) to approximately O($\sqrt{n}$), at the cost of occasionally missing the absolute nearest neighbour. For deduplication purposes, this approximation is acceptable: whether a task is 91\% or 93\% similar to an existing one, both would correctly be rejected by a threshold of 90\%.
+
+The pgvector extension for PostgreSQL implements both vector storage and approximate nearest-neighbour search natively within the relational database. This means deduplication queries execute within the same database transaction as the task insertion itself --- if the deduplication check succeeds and the insertion fails, no orphaned vectors are created.
+
+\subsection{Content Quality Validation}
+
+Language models sometimes produce responses that do not conform to the expected structure. A task might be missing required fields, have a field of the wrong type, or contain a response that is incoherent. In a synchronous system, malformed responses can be retried immediately. In a batch system, malformed content must not silently enter the database and later be delivered to a player.
+
+The pipeline validates every model response against a defined schema before any write occurs. If validation fails, the job retries the generation with the same parameters up to a fixed number of times. If all retries are exhausted, the task slot is discarded. A day with fewer tasks than the configured target is preferable to a day with one malformed task delivered to a player. The schema defines required fields, field types, and length constraints. Any response outside this definition is malformed and is not stored.
+
+\section{Data Persistence}
+
+\subsection{Why a Single Relational Database}
+
+The platform stores several categories of data with different characteristics: player identity and credentials, which must be accurate and never lost; player scores and progress, which must be transactionally correct; task content and embeddings, which are written once and read many times; and semantic vectors, which require specialised query operations. A first architectural question is whether one storage system can serve all these needs, or whether each category should use a specialised system.
+
+Using multiple storage systems introduces a synchronisation problem. If a task is written to the relational database but the write to a separate vector database fails, the system is inconsistent. Making such cross-system writes reliable requires distributed transaction coordination --- a significantly more complex engineering problem than single-system transactions, with its own failure modes and operational burden.
+
+A single relational database extended with vector capabilities avoids this problem. All data, including vectors, is stored in one system. Every write --- task content, embedding vector, and any associated metadata --- either all succeed or all fail within a single atomic transaction. There is no synchronisation problem because there is one system. The operational burden is that of one database, not two.
+
+PostgreSQL with the pgvector extension satisfies both requirements: full relational capabilities with ACID (Atomicity, Consistency, Isolation, Durability) transaction guarantees, and native vector similarity search. This combination makes a single database the correct choice.
+
+\subsection{Transactional Correctness and ACID}
+
+ACID is a set of properties that a database must guarantee for transactions --- groups of operations that should behave as a single unit. These properties are essential for correctness in a system where scores represent real player effort.
+
+Atomicity means "all or nothing." When a player completes a task, two writes must happen together: the score is increased, and the task is marked as complete. If the server process crashes between these two writes, the player either has points without a completion record (which can be exploited) or a completion record without points (which is unfair). Atomicity guarantees that both writes succeed or neither does. This is analogous to a bank transfer: either both accounts are updated or neither is --- there is no halfway state where money has left one account but not arrived at the other.
+
+Isolation means that concurrent requests cannot interfere with each other's operations. If two requests for the same player's score arrive simultaneously and both read the current score before either writes, one write will overwrite the other, and the player will receive fewer points than earned. Isolation prevents this by ensuring that each transaction sees a consistent state of the data.
+
+Durability means that a confirmed write survives a server crash. Once the database confirms that a score update has been committed, that update is present even if the server loses power immediately after. The player earned those points; the database's commitment is the system's commitment to the player.
+
+\subsection{Concurrent Write Safety}
+
+Multiple requests for the same player's data can arrive at the server simultaneously, particularly when the mobile client retries a submission after a network timeout. Without protection, two simultaneous score updates can interfere, producing a result where one update silently overwrites the other.
+
+The problem is a race condition: Request A reads the score, Request B reads the same score, both compute an updated value, and one write overwrites the other. Neither write fails --- both succeed silently --- but the final score is incorrect.
+
+Optimistic locking resolves this without serialising requests. Every score record carries a version counter. When a request reads the score, it notes the current version. When it writes the updated score, it includes a condition: only apply this update if the version is still the value read. If another request has already incremented the version, the condition fails, the write returns zero rows updated, and the application retries. No lock is held between the read and the write, so concurrent requests proceed freely and conflict resolution happens only in the rare case of an actual collision.
+
+For simple score increments that do not require any conditional logic, the database can express the operation atomically: \texttt{score = score + 10} rather than read, compute, write. The database performs the read and write as a single atomic unit; no race window exists.
+
+A separate idempotency problem arises from network retries. A player submits a task completion; the network drops before the acknowledgement arrives; the client retries. Without protection, the score is applied twice. A unique constraint at the database level on the combination of player identifier and task identifier prevents this: the second insert fails immediately with a constraint violation, which the application catches and interprets as a duplicate rather than an error. The player receives their points exactly once, regardless of how many times the client retried.
+
+\section{Mobile Client Architecture}
+
+\subsection{Offline-First Design}
+
+Mobile networks are unreliable. Players use the platform in locations with poor or absent connectivity: public transport, basements, areas with limited signal. A platform that requires a live network connection for every interaction will fail users in these situations, breaking the engagement loop at the most inconvenient moments.
+
+The offline-first principle inverts the assumption: the client should function correctly without a network connection, synchronising with the server whenever connectivity is available rather than requiring it for every operation. This means two things in practice.
+
+First, task content is cached on the device after its first successful download. Subsequent accesses serve content from the local cache rather than from the network. A player who loaded today's task content while connected can still access it after losing connectivity. The cache is invalidated at midnight, when new content for the following day becomes available.
+
+Second, score submissions use the outbox pattern. Before the client attempts to send a completion record to the server, it writes the intent to a local persistent queue --- the outbox. A background process monitors the queue and attempts to flush each entry to the server. When the server confirms receipt, the entry is removed from the queue. If the application is closed or the network drops, the queue persists on disk. The next time the application has connectivity, the background process resumes flushing the queue. The server must handle duplicate submissions gracefully --- the idempotency constraint described above ensures that a retried submission is recognised and ignored rather than applied twice.
+
+\subsection{Caching Strategy}
+
+Task content has a natural lifecycle: it is generated once per night, remains immutable throughout the day, and is replaced by new content at midnight. For immutable data with a predictable lifecycle, time-based cache expiry at the lifecycle boundary is the correct strategy. The cache holds task content until midnight; at midnight, the cache is invalidated and new content is fetched on the next access. There is no need for event-driven invalidation because the content does not change within its lifecycle.
+
+Player scores require a different strategy. Scores change every time a task is completed or a penalty is applied. A cached score that is even one update behind is incorrect. For score data, the correct strategy is write-through caching: when a score is updated, the cache is updated in the same operation, before success is reported. The cache is never stale because it is updated atomically with the authoritative store.
+
+When the cache reaches capacity, it must decide which entries to evict. LRU (Least Recently Used) eviction discards the entry that has not been accessed for the longest time. For this platform, whose users are enrolled in specific subject domains and access content within those domains repeatedly, LRU naturally keeps active domain content warm in the cache while allowing inactive domain content to fall out.
+
+\section{Authentication and Session Management}
+
+\subsection{Delegated Authentication}
+
+Every player action --- submitting a task completion, fetching a score, claiming a badge --- must be attributed to a verified identity. The platform must know who each user is. The traditional approach is for the platform to manage passwords: users create accounts, the platform hashes and stores their passwords, and compares hashes on login. This approach places the responsibility for credential security on the platform. If the platform's database is breached, all user credentials are exposed. Users who reuse passwords across services have those other accounts compromised as a consequence.
+
+Delegated authentication eliminates this risk by design. Instead of authenticating users itself, the platform relies on a trusted third-party identity provider that the user already has an account with. The user authenticates with the identity provider, which confirms their identity to the platform by issuing a cryptographic token. The platform never sees a password. There is no password database to breach.
+
+This model follows the OAuth~2.0 protocol, the industry standard for delegated authorisation \cite{springboot2024}. OAuth~2.0 defines a structured flow in which the identity provider and the platform exchange tokens with defined scopes and lifetimes, each step cryptographically verifiable.
+
+After the identity provider confirms the user's identity, the backend issues its own JWT (JSON Web Token --- a signed, self-contained credential) for subsequent requests. A JWT encodes the user's identity and any relevant permissions as a structured payload, signed with a secret key. Any backend server instance can verify the JWT by checking the signature without consulting a central session store, enabling the backend to scale horizontally without shared state.
+
+\subsection{Dual-Token Architecture}
+
+A JWT issued at login must have a lifetime. A long-lived token that remains valid for days is convenient but creates a large exposure window: a stolen token grants access for the token's full lifetime. A short-lived token that expires in minutes limits the exposure window but requires the user to re-authenticate frequently, disrupting the engagement experience.
+
+The dual-token architecture resolves this tension. The backend issues two tokens at login. The access token is short-lived, expiring in 15 minutes. It is held only in application memory, never written to persistent storage, so it disappears when the application is closed or the process is terminated. The refresh token is long-lived, valid for 7 days, and stored in a secure, application-sandboxed location on the device. When the access token expires, the application silently presents the refresh token to receive a new access token --- the user does not need to log in again.
+
+Critically, when a refresh token is used, it is immediately invalidated and a new one is issued. The server records which refresh token is current for each session. If a stolen refresh token is used --- by an attacker --- the server issues a new token to the attacker. When the legitimate user next uses their own (now stale) refresh token, the server detects that a token has been presented after it was already invalidated. This is evidence of theft. The server invalidates all tokens for the account and forces re-authentication. The attack is detected and contained, even though the attacker had temporary access.
+
+\section{Scoring Engine}
+
+The scoring engine is the mechanism that converts task completion into the motivational signal sustaining daily engagement. It operates on the server side, not the client, for two reasons: server-side execution prevents score manipulation by modifying client code, and it ensures correctness under concurrent submissions.
+
+The engine evaluates each task completion against a set of configurable rules. A correct and timely response earns a base reward. A response submitted within a streak --- a defined number of consecutive days of engagement --- earns a multiplied reward. Inactivity beyond a configurable threshold triggers a penalty, applied to the player's current score. Specific milestone scores trigger badge awards, which are recorded separately and displayed in the player's profile.
+
+Every evaluation is expressed as a database transaction that applies the score change and records the completion atomically, using the optimistic locking and idempotency mechanisms described in Section~3.3.3. The engine produces a response that the mobile client uses to display immediate feedback --- points earned, badges awarded, current streak --- without any additional round-trips to the server.
+
+\section{Consistency Trade-offs}
+
+\subsection{Task Content: Availability over Consistency}
+
+In any distributed system, when a network disruption prevents communication between components, a choice must be made. Either the system continues serving responses that may be slightly stale (favouring availability), or it refuses to serve responses until it can guarantee they reflect the latest state (favouring consistency). This mathematical constraint, known as the CAP theorem, means no system can simultaneously guarantee perfect consistency and perfect availability during a network partition.
+
+The resolution is that different data in the same system can have different requirements, and designing for this is an act of engineering maturity. A blanket policy of "always consistent" means players see error screens when today's task content cannot be confirmed as current. A blanket policy of "always available" means player scores can be wrong.
+
+Task content is a candidate for availability over consistency. Consider what staleness looks like: a player receives yesterday's task because today's has not yet propagated to the cache. The content is still a real educational task --- valid, well-formed, appropriate for the domain. The engagement loop continues. Compare this with the alternative: the player opens the app and sees an error message because the backend cannot confirm the latest task content. The player who cannot engage today is less likely to return tomorrow. The disruption to the engagement loop is worse than the stale content. Therefore, task content is served from a cache that may be slightly stale, and this is correct by design.
+
+\subsection{Player Scores: Consistency over Availability}
+
+Player scores are a candidate for consistency over availability. Consider what a stale score looks like: a player completes a task, expects to see their score increase, and instead sees the same number they had before. Or worse, the displayed score does not reflect recent completions. The core contract of a gamified system --- effort produces visible reward --- is broken. A player whose effort is not visibly rewarded will stop making the effort. The platform fails at its fundamental purpose.
+
+A brief wait for a consistent score read is acceptable. An incorrect score is not. Therefore, score reads are served from the authoritative source, not from a potentially stale cache, and writes apply write-through cache updates to keep the cache current. The consistency requirement demands this even at a small cost to read performance.
+
+\section{Observability}
+
+A system running in production is opaque by default. Users experience problems they cannot articulate. Without instrumentation, the developer has no way to know which component failed, how often, or with what impact. Observability is the set of tools that make the system's internal state visible from its external outputs.
+
+Average latency is an insufficient metric. If 95\% of requests take 50 milliseconds and 5\% take 1,050 milliseconds, the average is approximately 100 milliseconds --- a figure that suggests acceptable performance while hiding that one in twenty users has a deeply broken experience. Percentile metrics expose the distribution: P50 (the median) shows typical performance, P95 shows the experience of the majority of users at the slow end, and P99 identifies tail behaviour affecting a smaller but non-zero population.
+
+Structured logs outperform plain text for operational investigation. A plain text log line such as \texttt{"Generated task 4821 in 1840ms"} cannot be queried without parsing. A structured log entry encodes the same event as a queryable document: event type, task identifier, duration, domain, tokens consumed, and a trace identifier. The trace identifier connects every log entry produced during a single operation --- a batch run, a user request --- into a reconstructable sequence. Filtering by trace identifier shows exactly what happened, in order, for any specific operation.
+
+The platform emits structured logs from all components with consistent field names. The nightly batch job logs each generation attempt, its outcome, and the duration. The API layer logs request timing, authentication outcome, and upstream database query durations. These logs are the primary diagnostic tool for investigating failures reported after the fact.
+
+\section{Deployment}
+
+The backend, database, and any auxiliary services are deployed as a set of coordinated containers using Docker Compose. A container is a self-contained runtime environment that packages the application and all its dependencies. Docker Compose orchestrates multiple containers --- in this case, the Spring Boot backend and the PostgreSQL database --- as a single deployable unit, with defined networking between them, shared configuration, and coordinated startup order.
+
+This deployment model provides two important properties. First, reproducibility: the same Docker Compose configuration that runs on the developer's machine also runs in production. The risk of environment-specific failures is reduced by the fact that both environments are identical. Second, portability: the application can be moved to any host that supports Docker without modifying code or configuration.
+
+The stateless design of the backend, described in Section~3.6, means that scaling from one backend instance to multiple requires only configuration changes to a reverse proxy, with no changes to the application code. The current deployment runs a single backend instance, which is appropriate for the initial deployment scale. The architecture supports horizontal scaling when load requires it.

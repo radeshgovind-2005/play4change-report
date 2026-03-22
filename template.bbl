@@ -162,6 +162,24 @@
   {Postgres}}
   \endentry
 
+  \entry{springboot2024}{misc}{}{}
+    \name{author}{1}{}{%
+      {{hash=P}{%
+         family={{Pivotal Software}},
+         familyi={P\bibinitperiod},
+      }}%
+    }
+    \strng{namehash}{P1}
+    \strng{fullhash}{P1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{sortinit}{S}
+    \field{sortinithash}{S}
+  \field{howpublished}{\url{https://docs.spring.io/spring-boot/docs/current/reference/html/}}
+    \field{note}{Accessed: March 2026}
+    \field{title}{Spring {Boot} Reference Documentation}
+  \endentry
+
   \entry{zhonggen2019meta}{article}{}{}
     \name{author}{1}{}{%
       {{hash=ZY}{%
